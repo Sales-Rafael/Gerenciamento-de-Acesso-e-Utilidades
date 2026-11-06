@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block titulo %}Histórico de acessos{% endblock %}
+{% block conteudo %}
+<div class="card">
+  <h1>Histórico de acessos</h1>
+  <form class="filtros" method="get" action="{{ url_for('admin_logs') }}" id="form-filtros" autocomplete="off">
+    <div class="filtro-campo filtro-pessoa">
+      <label for="f-pessoa">Pessoa ou crachá</label>
+      <input id="f-pessoa" name="pessoa" value="{{ filtros['pessoa'] }}" list="lista-pessoas" placeholder="Digite um nome ou UID" maxlength="80">
+      <datalist id="lista-pessoas">{% for n in nomes %}<option value="{{ n }}">{% endfor %}</datalist>
+    </div>
+    <div class="filtro-campo">
+      <label for="f-lab">Laboratório</label>
+      <select id="f-lab" name="lab">
+        <option value="">Todos</option>
+        {% for l in todos_labs %}<option value="{{ l['id'] }}"{% if filtros['lab'] == l['id']|string %} selected{% endif %}>{{ l['nome'] }}{% if not l['ativo'] %} (desativado){% endif %}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="filtro-campo">
+      <label for="f-de">De</label>
+      <input id="f-de" name="de" type="date" value="{{ filtros['de'] }}">
+    </div>
+    <div class="filtro-campo">
+      <label for="f-ate">Até</label>
+      <input id="f-ate" name="ate" type="date" value="{{ filtros['ate'] }}">
+    </div>
+    <div class="filtro-acoes">
+      <button type="button" class="cinza" id="f-limpar" {% if not (filtros['pessoa'] or filtros['de'] or filtros['ate'] or filtros['lab']) %}hidden{% endif %}>Limpar filtro</button>
+    </div>
+  </form>
+  <div id="logs-conteudo" data-v="{{ versao }}">{{ parcial|safe }}</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  /* filtro ao vivo: a lista se atualiza sozinha (a cada 2 s e a cada alteração nos campos), sem recarregar a página */
+  (function () {
+    var form = document.getElementById('form-filtros'), alvo = document.getElementById('logs-conteudo');
+    var limpar = document.getElementById('f-limpar'), campos = form.querySelectorAll('input, select');
+    var base = '{{ url_for("parcial_logs") }}', timer, ocupado = false, pendente = false;
+
+    function query() {
+      var q = new URLSearchParams();
+      campos.forEach(function (c) { if (c.value.trim()) q.set(c.name, c.value.trim()); });
+      return q.toString();
+    }
+    function busca(forca) {
+      if (document.hidden && !forca) return;
+      if (ocupado) { pendente = true; return; }
+      ocupado = true;
+      var q = query();
+      fetch(base + (q ? '?' + q : ''), { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (r) { if (!r.ok || r.redirected) throw new Error('sem acesso'); return r.json(); })
+        .then(function (d) {
+          if (q !== query()) return;                       // o filtro mudou enquanto buscava: descarta
+          if (d.v !== alvo.getAttribute('data-v')) { alvo.innerHTML = d.html; alvo.setAttribute('data-v', d.v); }
+        })
+        .catch(function () {})
+        .then(function () { ocupado = false; if (pendente) { pendente = false; busca(true); } });
+    }
+    function mudou() {
+      var q = query();
+      history.replaceState(null, '', location.pathname + (q ? '?' + q : ''));   // a URL guarda o filtro (F5 mantém)
+      limpar.hidden = !q;
+      clearTimeout(timer); timer = setTimeout(function () { busca(true); }, 250);
+    }
+    campos.forEach(function (c) { c.addEventListener('input', mudou); c.addEventListener('change', mudou); });
+    form.addEventListener('submit', function (ev) { ev.preventDefault(); });   // Enter não recarrega a página
+    limpar.addEventListener('click', function () { campos.forEach(function (c) { c.value = ''; }); mudou(); });
+    setInterval(busca, 2000);
+    document.addEventListener('visibilitychange', function () { busca(); });
+  })();
+</script>
+{% endblock %}

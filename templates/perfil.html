@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block titulo %}Meu perfil{% endblock %}
+{% block conteudo %}
+{% set partes = (user['nome'] or '?').split() or ['?'] %}
+<div class="perfil-pagina">
+  <div class="card perfil-resumo">
+    <span class="avatar-grande" aria-hidden="true">{{ (partes[0][0] ~ (partes[-1][0] if partes|length > 1 else ''))|upper }}</span>
+    <div>
+      <h1>{{ user['nome'] }}</h1>
+      <p class="pequeno">{{ user['email'] }}</p>
+      <span class="etiqueta-nivel {{ 'adm' if user['nivel'] == 'adm' else '' }}">{{ user['nivel']|nivel_nome }}</span>
+    </div>
+    <dl class="perfil-info">
+      <div><dt>Crachá (UID)</dt><dd>{% if user['uid_cracha'] %}<code>{{ user['uid_cracha'] }}</code>{% else %}Nenhum crachá vinculado{% endif %}</dd></div>
+      <div><dt>Nível de acesso</dt><dd>{{ user['nivel']|nivel_nome }}</dd></div>
+    </dl>
+    <p class="pequeno nota">O nível e o crachá só podem ser alterados pelo administrador.</p>
+  </div>
+
+  <div class="perfil-colunas">
+    <div class="card">
+      <h2>Meus dados</h2>
+      <form method="post" action="{{ url_for('perfil_dados') }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label for="p-nome">Nome</label>
+        <input id="p-nome" name="nome" value="{{ user['nome'] }}" maxlength="120" required>
+        <label for="p-email">E-mail (usado para entrar)</label>
+        <input id="p-email" name="email" type="email" value="{{ user['email'] }}" required>
+        <p><button type="submit">Salvar dados</button></p>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Alterar senha</h2>
+      <form method="post" action="{{ url_for('perfil_senha') }}" id="form-senha">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label for="s-atual">Senha atual</label>
+        <input id="s-atual" name="atual" type="password" autocomplete="current-password" required>
+        <label for="s-nova">Nova senha (mín. 6 caracteres)</label>
+        <input id="s-nova" name="nova" type="password" minlength="6" autocomplete="new-password" required>
+        <div class="forca" aria-hidden="true"><i></i></div>
+        <label for="s-conf">Repita a nova senha</label>
+        <input id="s-conf" name="confirma" type="password" minlength="6" autocomplete="new-password" required>
+        <p class="pequeno" id="s-aviso" aria-live="polite"></p>
+        <p><button type="submit">Alterar senha</button></p>
+      </form>
+    </div>
+  </div>
+
+  <div class="card perfil-aparencia">
+    <h2>Aparência</h2>
+    <label for="vel-fundo">Velocidade das bolinhas do fundo <strong class="vel-valor" id="vel-valor">100%</strong></label>
+    <input id="vel-fundo" type="range" min="0" max="1000" step="5" value="100" aria-describedby="vel-aviso">
+    <div class="vel-escala" aria-hidden="true"><span>Parado</span><span>Normal</span><span>Rápido</span></div>
+    <p class="pequeno" id="vel-aviso" aria-live="polite">Ao soltar o controle, a velocidade já fica salva e vale para todas as páginas do site neste navegador.</p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  /* velocidade do fundo: mostra ao vivo enquanto arrasta e salva ao soltar (sem botão) */
+  (function () {
+    var sl = document.getElementById('vel-fundo'), val = document.getElementById('vel-valor'), aviso = document.getElementById('vel-aviso');
+    var padrao = aviso.textContent, timer = null;
+    try { var v = parseInt(localStorage.getItem('velFundo'), 10); if (v >= 0 && v <= 1000) sl.value = v; } catch (e) {}
+    function mostra() { val.textContent = sl.value + '%'; }
+    mostra();
+    sl.addEventListener('input', function () {
+      mostra();
+      if (window.definirVelocidadeFundo) window.definirVelocidadeFundo(parseInt(sl.value, 10));
+    });
+    sl.addEventListener('change', function () {
+      var ok = true;
+      try { localStorage.setItem('velFundo', sl.value); } catch (e) { ok = false; }
+      aviso.textContent = ok ? 'Velocidade salva: ' + sl.value + '%.' : 'Não foi possível salvar neste navegador.';
+      clearTimeout(timer);
+      timer = setTimeout(function () { aviso.textContent = padrao; }, 2500);
+    });
+  })();
+</script>
+<script>
+  (function () {
+    var nova = document.getElementById('s-nova'), conf = document.getElementById('s-conf');
+    var barra = document.querySelector('.forca i'), aviso = document.getElementById('s-aviso');
+    function forca(v) {
+      var n = 0;
+      if (v.length >= 6) n++; if (v.length >= 10) n++;
+      if (/[A-Z]/.test(v) && /[a-z]/.test(v)) n++; if (/\d/.test(v) && /[^A-Za-z0-9]/.test(v)) n++;
+      return n;
+    }
+    function atualiza() {
+      var n = nova.value ? forca(nova.value) : 0;
+      barra.style.width = (n * 25) + '%';
+      barra.style.background = ['#c0392b', '#c0392b', '#f5a033', '#1f8a4c', '#1f8a4c'][n];
+      if (conf.value && conf.value !== nova.value) aviso.textContent = 'As senhas ainda não são iguais.';
+      else aviso.textContent = '';
+    }
+    nova.addEventListener('input', atualiza); conf.addEventListener('input', atualiza);
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Acesso ao Laboratório{% endblock %}</title>
+  <script>
+    /* aplica o tema salvo antes de desenhar a página (evita "piscar" claro) */
+    try { document.documentElement.setAttribute('data-tema', localStorage.getItem('tema') === 'escuro' ? 'escuro' : 'claro'); } catch (e) {}
+  </script>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32.png') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon-180.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+</head>
+<body>
+  {% if user %}<canvas id="fundo-rede" aria-hidden="true"></canvas>{% endif %}
+  {% if user %}
+  <header>
+    <span class="titulo">Acesso ao Laboratório</span>
+    <button class="link menu-toggle" type="button" id="menu-toggle" aria-controls="menu" aria-expanded="false" aria-label="Abrir menu">
+      <span class="hb" aria-hidden="true"><i></i><i></i><i></i></span>
+    </button>
+    {% if user %}
+    <nav class="menu" id="menu" aria-label="Menu principal">
+      <a href="{{ url_for('calendario') }}"{% if request.endpoint == 'calendario' %} class="ativa" aria-current="page"{% endif %}>Calendário</a>
+      <a href="{{ url_for('minhas_reservas') }}"{% if request.endpoint == 'minhas_reservas' %} class="ativa" aria-current="page"{% endif %}>Minhas reservas
+        {% if novidades is number and novidades %}<span class="badge badge-novo" title="{{ novidades }} atualização(ões) nas suas solicitações">{{ novidades }}</span>{% endif %}</a>
+      {% if user['nivel'] == 'adm' %}
+        <a href="{{ url_for('admin_solicitacoes') }}"{% if request.endpoint == 'admin_solicitacoes' %} class="ativa" aria-current="page"{% endif %}>Solicitações
+          {% if pendentes is number and pendentes %}<span class="badge">{{ pendentes }}</span>{% endif %}</a>
+        <a href="{{ url_for('admin_laboratorios') }}"{% if request.endpoint == 'admin_laboratorios' %} class="ativa" aria-current="page"{% endif %}>Laboratórios</a>
+        <a href="{{ url_for('admin_usuarios') }}"{% if request.endpoint == 'admin_usuarios' %} class="ativa" aria-current="page"{% endif %}>Usuários e crachás</a>
+        <a href="{{ url_for('admin_decisoes') }}"{% if request.endpoint == 'admin_decisoes' %} class="ativa" aria-current="page"{% endif %}>Histórico de decisões</a>
+        <a href="{{ url_for('admin_logs') }}"{% if request.endpoint == 'admin_logs' %} class="ativa" aria-current="page"{% endif %}>Histórico de acessos</a>
+      {% endif %}
+      {# "Sair" dentro do menu: só aparece no celular (no resto da tela fica o botão do cabeçalho) #}
+      <form class="inline menu-sair" method="post" action="{{ url_for('logout') }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="link" type="submit">Sair</button>
+      </form>
+    </nav>
+      <span class="espaco"></span>
+      <span class="relogio" id="relogio" title="Hora atual" aria-label="Hora atual">--:--:--</span>
+      <button class="link tema" type="button" id="tema" title="Alternar modo claro/escuro" aria-label="Alternar modo claro/escuro"><span class="tema-icone">🌙</span></button>
+      {% set partes = (user['nome'] or '?').split() or ['?'] %}
+      <a class="perfil{{ ' ativa' if request.endpoint == 'perfil' }}"{% if request.endpoint == 'perfil' %} aria-current="page"{% endif %} href="{{ url_for('perfil') }}" title="Meu perfil: ver e alterar meus dados e senha">
+        <span class="avatar" aria-hidden="true">{{ (partes[0][0] ~ (partes[-1][0] if partes|length > 1 else ''))|upper }}</span>
+        <span class="perfil-txt">
+          <span class="perfil-nome">{{ user['nome'] }}</span>
+          <span class="perfil-nivel">{{ user['nivel']|nivel_nome }}</span>
+        </span>
+      </a>
+      <form class="inline" method="post" action="{{ url_for('logout') }}">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="link" type="submit">Sair</button>
+      </form>
+    {% endif %}
+  </header>
+  {% endif %}
+  {% block mensagens %}
+  {% with mensagens = get_flashed_messages(with_categories=true) %}
+    {% if mensagens %}
+    <div class="toasts{{ ' tem-erro' if mensagens|selectattr('0', 'equalto', 'erro')|list }}" id="toasts" role="status" aria-live="polite">
+      {% for categoria, texto in mensagens %}
+        <div class="toast {{ categoria }}">{{ texto }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endwith %}
+  {% endblock %}
+  <main class="{% block mainclass %}{% endblock %}">
+    {% block conteudo %}{% endblock %}
+  </main>
+  <script>
+    /* avisos: entram deslizando por baixo da barra e voltam para cima, sumindo por baixo dela */
+    (function () {
+      var topo = document.querySelector('header');
+      function posiciona() {
+        if (topo) document.documentElement.style.setProperty('--topo', topo.offsetHeight + 'px');
+      }
+      posiciona();
+      window.addEventListener('resize', posiciona);
+      var caixa = document.getElementById('toasts');
+      if (caixa) caixa.addEventListener('animationend', function (ev) {
+        if (ev.target === caixa && (ev.animationName === 'toasts-sai' || ev.animationName === 'toasts-some')) {
+          caixa.parentNode.removeChild(caixa);
+        }
+      });
+    })();
+
+    /* atualização automática: busca o trecho da página a cada poucos segundos e só troca se mudou */
+    window.ligaAtualizacao = function (id, url, ms) {
+      var alvo = document.getElementById(id);
+      if (!alvo) return;
+      var ocupado = false;
+      function busca() {
+        if (document.hidden || ocupado) return;
+        ocupado = true;
+        fetch(url, { credentials: 'same-origin', cache: 'no-store' })
+          .then(function (r) { if (!r.ok || r.redirected) throw new Error('sem acesso'); return r.json(); })
+          .then(function (d) {
+            if (d.v !== alvo.getAttribute('data-v')) {
+              alvo.innerHTML = d.html;
+              alvo.setAttribute('data-v', d.v);
+            }
+          })
+          .catch(function () {})
+          .then(function () { ocupado = false; });
+      }
+      setInterval(busca, ms || 2000);
+      document.addEventListener('visibilitychange', busca);
+    };
+  </script>
+  <script>
+    /* menu do celular: abre/fecha o botão ☰; fecha ao tocar fora, ao apertar Esc ou ao voltar para a tela larga */
+    (function () {
+      var b = document.getElementById('menu-toggle'), m = document.getElementById('menu');
+      if (!b || !m) return;
+      function define(abrir) {
+        m.classList.toggle('aberto', abrir);
+        b.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+        b.setAttribute('aria-label', abrir ? 'Fechar menu' : 'Abrir menu');
+      }
+      b.addEventListener('click', function (ev) { ev.stopPropagation(); define(!m.classList.contains('aberto')); });
+      document.addEventListener('click', function (ev) {
+        if (m.classList.contains('aberto') && !m.contains(ev.target)) define(false);
+      });
+      document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape' && m.classList.contains('aberto')) { define(false); b.focus(); }
+      });
+      window.addEventListener('resize', function () { if (window.innerWidth > 640) define(false); });
+      window.addEventListener('pageshow', function () { define(false); });
+    })();
+  </script>
+  <script>
+    /* relógio da barra: HH:MM:SS, atualizado a cada segundo */
+    (function () {
+      var r = document.getElementById('relogio');
+      if (!r) return;
+      function dois(n) { return (n < 10 ? '0' : '') + n; }
+      function tick() {
+        var d = new Date();
+        r.textContent = dois(d.getHours()) + ':' + dois(d.getMinutes()) + ':' + dois(d.getSeconds());
+      }
+      tick();
+      setInterval(tick, 1000);
+    })();
+  </script>
+  <script>
+    (function () {
+      var btn = document.getElementById('tema');
+      if (!btn) return;
+      var ico = btn.querySelector('.tema-icone');
+      if (!ico) { ico = document.createElement('span'); ico.className = 'tema-icone'; ico.textContent = btn.textContent; btn.textContent = ''; btn.appendChild(ico); }   // botão da tela de login
+      var reduz = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var timer = null;
+      function atual() { return document.documentElement.getAttribute('data-tema') === 'escuro'; }
+      function icone() { ico.textContent = atual() ? '☀️' : '🌙'; }
+      btn.addEventListener('click', function () {
+        var novo = atual() ? 'claro' : 'escuro';
+        var raiz = document.documentElement;
+        /* troca suave das cores */
+        raiz.classList.add('trocando-tema');
+        setTimeout(function () { raiz.classList.remove('trocando-tema'); }, 450);
+        raiz.setAttribute('data-tema', novo);
+        try { localStorage.setItem('tema', novo); } catch (e) {}
+        if (reduz) { icone(); return; }
+        /* o ícone atual gira e some; troca para o outro, que gira e aparece; o botão dá um "apertão" */
+        clearTimeout(timer);
+        btn.classList.remove('apertou'); ico.classList.remove('entra'); ico.classList.add('sai');
+        void btn.offsetWidth;
+        btn.classList.add('apertou');
+        timer = setTimeout(function () {
+          icone();
+          ico.classList.remove('sai'); ico.classList.add('entra');
+          timer = setTimeout(function () { ico.classList.remove('entra'); btn.classList.remove('apertou'); }, 380);
+        }, 180);
+      });
+      icone();
+    })();
+  </script>
+  <script>
+    /* fundo animado: pontos que flutuam devagar e se ligam por linhas quando ficam perto */
+    (function () {
+      var cv = document.getElementById('fundo-rede');
+      if (!cv || !cv.getContext) return;
+      var ctx = cv.getContext('2d');
+      var raiosPossiveis = [4, 4, 5, 5, 6, 6, 9, 9, 12];
+      var w = 0, h = 0, dpr = 1, nos = [], cores = null, rodando = false;
+      var parado = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      /* velocidade escolhida no perfil (0 a 1000 %, padrão 100), guardada neste navegador e valendo em todas as páginas */
+      var mult = 1;
+      /* de 0 a 100 % a velocidade sobe de parado até a "normal" (que é 3,17 vezes a velocidade original, igual ao que
+         antes era 150 %); de 100 a 1000 % ela continua subindo até 40 vezes a original */
+      var BASE = 1 + 50 / 900 * 39, MAXIMO = 40;
+      function fator(pct) {
+        pct = Math.max(0, Math.min(1000, pct));
+        return pct <= 100 ? pct / 100 * BASE : BASE + (pct - 100) / 900 * (MAXIMO - BASE);
+      }
+      function lerVelocidade() {
+        try {
+          var v = parseInt(localStorage.getItem('velFundo'), 10);
+          mult = (v >= 0 && v <= 1000) ? fator(v) : BASE;
+        } catch (e) { mult = BASE; }
+      }
+      lerVelocidade();
+      window.definirVelocidadeFundo = function (pct) { mult = fator(pct); };
+      window.addEventListener('storage', function (ev) { if (ev.key === 'velFundo') lerVelocidade(); });
+
+      function lerCores() {
+        var st = getComputedStyle(document.documentElement);
+        cores = {
+          linha: (st.getPropertyValue('--rede-linha') || '150,176,210').trim(),
+          ponto: (st.getPropertyValue('--rede-ponto') || '168,190,220').trim()
+        };
+      }
+      function cria() {
+        var qtd = Math.max(26, Math.min(64, Math.round(w * h / 24000)));
+        var antigos = nos, novos = [];
+        for (var i = 0; i < qtd; i++) {
+          var n = antigos[i] || {};
+          var ang = Math.random() * Math.PI * 2, vel = .12 + Math.random() * .22;
+          novos.push({
+            x: n.x != null ? Math.min(n.x, w) : Math.random() * w,
+            y: n.y != null ? Math.min(n.y, h) : Math.random() * h,
+            vx: n.vx != null ? n.vx : Math.cos(ang) * vel,
+            vy: n.vy != null ? n.vy : Math.sin(ang) * vel,
+            r: n.r || raiosPossiveis[(Math.random() * raiosPossiveis.length) | 0]
+          });
+        }
+        nos = novos;
+      }
+      function ajusta() {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        w = window.innerWidth; h = window.innerHeight;
+        cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        cria();
+        desenha();
+      }
+      function desenha() {
+        var alcance = Math.max(150, Math.min(210, w / 6)), a2 = alcance * alcance;
+        ctx.clearRect(0, 0, w, h);
+        ctx.lineWidth = 1.2;
+        for (var i = 0; i < nos.length; i++) {
+          for (var j = i + 1; j < nos.length; j++) {
+            var dx = nos[i].x - nos[j].x, dy = nos[i].y - nos[j].y, d2 = dx * dx + dy * dy;
+            if (d2 < a2) {
+              ctx.strokeStyle = 'rgba(' + cores.linha + ',' + (.75 * (1 - Math.sqrt(d2) / alcance)).toFixed(3) + ')';
+              ctx.beginPath(); ctx.moveTo(nos[i].x, nos[i].y); ctx.lineTo(nos[j].x, nos[j].y); ctx.stroke();
+            }
+          }
+        }
+        ctx.fillStyle = 'rgba(' + cores.ponto + ',.85)';
+        for (var k = 0; k < nos.length; k++) {
+          ctx.beginPath(); ctx.arc(nos[k].x, nos[k].y, nos[k].r, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      function passo() {
+        for (var i = 0; i < nos.length; i++) {
+          var n = nos[i];
+          n.x += n.vx * mult; n.y += n.vy * mult;
+          if (n.x < -20) n.x = w + 20; else if (n.x > w + 20) n.x = -20;
+          if (n.y < -20) n.y = h + 20; else if (n.y > h + 20) n.y = -20;
+        }
+      }
+      function quadro() {
+        if (!rodando) return;
+        passo(); desenha();
+        requestAnimationFrame(quadro);
+      }
+      function liga() { if (!parado && !rodando) { rodando = true; requestAnimationFrame(quadro); } }
+      function desliga() { rodando = false; }
+
+      lerCores();
+      ajusta();
+      var t; window.addEventListener('resize', function () { clearTimeout(t); t = setTimeout(ajusta, 120); });
+      document.addEventListener('visibilitychange', function () { document.hidden ? desliga() : liga(); });
+      new MutationObserver(function () { lerCores(); if (!rodando) desenha(); })
+        .observe(document.documentElement, { attributes: true, attributeFilter: ['data-tema'] });
+      liga();
+    })();
+  </script>
+  <script>
+    /* animações: linhas das tabelas, onda nos botões, carregando ao enviar e saída ao trocar de página */
+    (function () {
+      var reduz = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      /* linhas entram em sequência (só nas tabelas que não se atualizam sozinhas) */
+      document.querySelectorAll('main table').forEach(function (t) {
+        if (t.closest('[data-v]')) return;
+        t.querySelectorAll('tr').forEach(function (tr, i) {
+          if (tr.classList.contains('linha-recusa')) return;
+          tr.style.setProperty('--i', Math.min(i, 14));
+          tr.classList.add('entra-linha');
+        });
+      });
+
+      /* onda ao clicar nos botões */
+      document.addEventListener('click', function (ev) {
+        if (reduz) return;
+        var b = ev.target.closest && ev.target.closest('button, .btn');
+        if (!b || b.disabled || b.matches('.link, .dia, .sem-dia, .x-apagar, .painel-fechar, .tema')) return;
+        var r = b.getBoundingClientRect(), d = Math.max(r.width, r.height) * 2;
+        var o = document.createElement('span');
+        o.className = 'onda';
+        o.style.cssText = 'width:' + d + 'px;height:' + d + 'px;left:' + (ev.clientX - r.left - d / 2) + 'px;top:' + (ev.clientY - r.top - d / 2) + 'px';
+        if (getComputedStyle(b).position === 'static') b.style.position = 'relative';
+        b.style.overflow = 'hidden';
+        b.appendChild(o);
+        setTimeout(function () { if (o.parentNode) o.parentNode.removeChild(o); }, 600);
+      });
+
+      function sai() { document.body.classList.add('saindo'); }
+
+      /* ao enviar um formulário: botão "ocupado" (evita clique duplo) e página some */
+      document.addEventListener('submit', function (ev) {
+        if (ev.defaultPrevented) return;
+        var f = ev.target, b = ev.submitter || f.querySelector('button[type=submit], button:not([type])');
+        if (b && !b.classList.contains('link')) setTimeout(function () { b.classList.add('enviando'); }, 0);
+        if (!f.hasAttribute('target')) sai();
+      });
+
+      /* ao clicar num link interno: a página atual some antes de abrir a próxima */
+      document.addEventListener('click', function (ev) {
+        var a = ev.target.closest && ev.target.closest('a[href]');
+        if (!a || ev.defaultPrevented || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+        if (a.target && a.target !== '_self' || a.hasAttribute('download') || a.hasAttribute('data-arquivo')) return;
+        var u = new URL(a.href, location.href);
+        if (u.origin !== location.origin || (u.pathname === location.pathname && u.search === location.search)) return;
+        ev.preventDefault();
+        sai();
+        setTimeout(function () { location.href = a.href; }, reduz ? 120 : 190);
+      });
+
+      /* voltar pelo botão do navegador: tira o estado "saindo" */
+      window.addEventListener('pageshow', function () {
+        document.body.classList.remove('saindo');
+        document.querySelectorAll('button.enviando').forEach(function (b) { b.classList.remove('enviando'); });
+      });
+    })();
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block titulo %}Solicitações{% endblock %}
+{% block conteudo %}
+<div class="card">
+  <h1>Solicitações pendentes</h1>
+  {% if pendentes %}
+  <table>
+    <tr><th>Instrutor</th><th>Laboratório</th><th>Data</th><th>Horário</th><th>Turma</th><th>Motivo</th><th></th></tr>
+    {% for r in pendentes %}
+    <tr class="linha-anim" data-solic="{{ r['id'] }}">
+      <td data-label="Instrutor">{{ r['nome'] }}</td>
+      <td data-label="Laboratório">{{ r['lab_nome'] or '—' }}</td>
+      <td data-label="Data">
+        {% if r['datas']|length > 1 %}
+        <span title="{{ r['datas']|map('data_br')|join(', ') }}">{{ r['datas'][0]|data_br }} → {{ r['datas'][-1]|data_br }}</span>
+        <span class="etiqueta-serie">{{ r['datas']|length }} datas</span>
+        {% else %}{{ r['datas'][0]|data_br }}{% endif %}
+      </td>
+      <td data-label="Horário">{{ r['hora_inicio'] }} – {{ r['hora_fim'] }}</td>
+      <td data-label="Turma">{{ r['turma'] or '—' }}</td>
+      <td data-label="Motivo">{{ r['motivo'] or '—' }}</td>
+      <td>
+        <form class="inline" method="post" action="{{ url_for('decidir_reserva', rid=r['id'], acao='aprovar') }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="verde" type="submit">Aprovar</button>
+        </form>
+        <button class="vermelho abre-recusa" type="button" aria-expanded="false"
+                aria-controls="recusa-{{ r['id'] }}">Negar</button>
+      </td>
+    </tr>
+    <tr class="linha-recusa" id="recusa-{{ r['id'] }}">
+      <td colspan="7">
+        <div class="balao-wrap">
+          <div class="balao-wrap-in">
+            <form class="balao balao-recusa" method="post"
+                  action="{{ url_for('decidir_reserva', rid=r['id'], acao='negar') }}">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <label for="mr-{{ r['id'] }}">Motivo da recusa <span class="opcional">(opcional)</span></label>
+              <textarea id="mr-{{ r['id'] }}" name="motivo_recusa" maxlength="300" rows="2"
+                        placeholder="Explique a {{ r['nome'].split()[0] }} por que o pedido foi recusado…"></textarea>
+              <div class="balao-acoes">
+                <button class="vermelho" type="submit">Confirmar recusa</button>
+                <button class="cinza fecha-recusa" type="button">Voltar</button>
+                <span class="contador pequeno"><span class="n">0</span>/300</span>
+              </div>
+            </form>
+          </div>
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+    <p>Nenhuma solicitação pendente.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Próximas reservas aprovadas</h2>
+  {% if proximas %}
+  <table>
+    <tr><th>Instrutor</th><th>Laboratório</th><th>Data</th><th>Horário</th><th>Turma</th><th>Aprovada por</th><th></th></tr>
+    {% for r in proximas %}
+    <tr>
+      <td data-label="Instrutor">{{ r['nome'] }}</td>
+      <td data-label="Laboratório">{{ r['lab_nome'] or '—' }}</td>
+      <td data-label="Data">{{ r['data'][8:10] }}/{{ r['data'][5:7] }}/{{ r['data'][0:4] }}</td>
+      <td data-label="Horário">{{ r['hora_inicio'] }} – {{ r['hora_fim'] }}</td>
+      <td data-label="Turma">{{ r['turma'] or '—' }}</td>
+      <td data-label="Aprovada por">{% if r['decisor'] %}{{ r['decisor'] }} <span class="quando">{{ r['decidido_em']|dh_br }}</span>{% else %}—{% endif %}</td>
+      <td>
+        <form class="inline" method="post" action="{{ url_for('cancelar_reserva', rid=r['id']) }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <input type="hidden" name="voltar" value="{{ url_for('admin_solicitacoes') }}">
+          <button class="cinza" type="submit">Cancelar</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+    <p>Nenhuma reserva aprovada para os próximos dias.</p>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  /* balão de motivo da recusa: abre embaixo da solicitação */
+  (function () {
+    function fecha(linha, botao) {
+      linha.classList.remove('aberta');
+      if (botao) botao.setAttribute('aria-expanded', 'false');
+    }
+    document.querySelectorAll('tr[data-solic]').forEach(function (tr) {
+      var id = tr.getAttribute('data-solic');
+      var botao = tr.querySelector('.abre-recusa');
+      var linha = document.getElementById('recusa-' + id);
+      var campo = linha.querySelector('textarea');
+      var cont = linha.querySelector('.contador .n');
+      botao.addEventListener('click', function () {
+        var abrir = !linha.classList.contains('aberta');
+        /* só um balão aberto por vez */
+        document.querySelectorAll('tr.linha-recusa.aberta').forEach(function (l) {
+          fecha(l, document.querySelector('tr[data-solic="' + l.id.replace('recusa-', '') + '"] .abre-recusa'));
+        });
+        if (abrir) {
+          linha.classList.add('aberta');
+          botao.setAttribute('aria-expanded', 'true');
+          setTimeout(function () { campo.focus(); }, 280);
+        }
+      });
+      linha.querySelector('.fecha-recusa').addEventListener('click', function () { fecha(linha, botao); botao.focus(); });
+      campo.addEventListener('input', function () { cont.textContent = campo.value.length; });
+      campo.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') { fecha(linha, botao); botao.focus(); } });
+    });
+  })();
+</script>
+{% endblock %}

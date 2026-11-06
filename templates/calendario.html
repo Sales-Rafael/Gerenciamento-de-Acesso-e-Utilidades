@@ -1,0 +1,560 @@
+{% extends "base.html" %}
+{% block titulo %}Calendário{% endblock %}
+{% block conteudo %}
+<div class="cal-pagina">
+  <div class="cal-acoes">
+    <div class="cal-lab-filtro">
+      <label for="filtro-lab">Laboratório</label>
+      <select id="filtro-lab">
+        <option value="">Todos os laboratórios</option>
+        {% for l in laboratorios %}<option value="{{ l['id'] }}">{{ l['nome'] }}</option>{% endfor %}
+      </select>
+    </div>
+    <button type="button" class="btn-solicitar" id="abrir-solicitacao"
+            aria-controls="painel-solicitacao" aria-expanded="false">Solicitar o laboratório</button>
+  </div>
+  <div class="card"><div id="calendario"><p class="pequeno">Carregando calendário…</p></div></div>
+</div>
+
+<!-- painel que desliza da direita para a esquerda -->
+<div class="painel-fundo" id="painel-fundo"></div>
+<aside class="painel" id="painel-solicitacao" role="dialog" aria-modal="true"
+       aria-labelledby="painel-titulo" aria-hidden="true">
+  <div class="painel-topo">
+    <h2 id="painel-titulo">Solicitar o laboratório</h2>
+    <button type="button" class="painel-fechar" id="fechar-solicitacao" aria-label="Fechar painel">✕</button>
+  </div>
+  <form method="post" action="{{ url_for('nova_reserva') }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="lab-form">Laboratório</label>
+    <select id="lab-form" name="laboratorio" required>
+      <option value="" disabled selected hidden>Escolha o laboratório</option>
+      {% for l in laboratorios %}<option value="{{ l['id'] }}">{{ l['nome'] }}</option>{% endfor %}
+    </select>
+    <label for="data">Data</label>
+    <input id="data" name="data" type="date" min="{{ hoje }}" value="{{ data_padrao }}" required>
+    <div class="linha">
+      <div>
+        <label for="hi">Início</label>
+        <div class="hora-campo" data-hora>
+          <input id="hi" name="hora_inicio" type="text" required placeholder="--:--" autocomplete="off"
+                 pattern="([01][0-9]|2[0-3]):[0-5][05]" title="Escolha o horário na lista"
+                 aria-haspopup="listbox" aria-expanded="false">
+          <svg class="hora-icone" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          <div class="hora-popup" hidden>
+            <ul class="hora-col" data-col="h" role="listbox" aria-label="Hora">{% for h in range(24) %}<li class="hora-op" role="option" tabindex="-1" data-v="{{ '%02d'|format(h) }}">{{ '%02d'|format(h) }}</li>{% endfor %}</ul>
+            <ul class="hora-col" data-col="m" role="listbox" aria-label="Minutos"><li class="hora-op" role="option" tabindex="-1" data-v="00">00</li><li class="hora-op" role="option" tabindex="-1" data-v="05">05</li><li class="hora-op" role="option" tabindex="-1" data-v="10">10</li><li class="hora-op" role="option" tabindex="-1" data-v="15">15</li><li class="hora-op" role="option" tabindex="-1" data-v="20">20</li><li class="hora-op" role="option" tabindex="-1" data-v="25">25</li><li class="hora-op" role="option" tabindex="-1" data-v="30">30</li><li class="hora-op" role="option" tabindex="-1" data-v="35">35</li><li class="hora-op" role="option" tabindex="-1" data-v="40">40</li><li class="hora-op" role="option" tabindex="-1" data-v="45">45</li><li class="hora-op" role="option" tabindex="-1" data-v="50">50</li><li class="hora-op" role="option" tabindex="-1" data-v="55">55</li></ul>
+          </div>
+        </div>
+      </div>
+      <div>
+        <label for="hf">Fim</label>
+        <div class="hora-campo" data-hora>
+          <input id="hf" name="hora_fim" type="text" required placeholder="--:--" autocomplete="off"
+                 pattern="([01][0-9]|2[0-3]):[0-5][05]" title="Escolha o horário na lista"
+                 aria-haspopup="listbox" aria-expanded="false">
+          <svg class="hora-icone" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          <div class="hora-popup" hidden>
+            <ul class="hora-col" data-col="h" role="listbox" aria-label="Hora">{% for h in range(24) %}<li class="hora-op" role="option" tabindex="-1" data-v="{{ '%02d'|format(h) }}">{{ '%02d'|format(h) }}</li>{% endfor %}</ul>
+            <ul class="hora-col" data-col="m" role="listbox" aria-label="Minutos"><li class="hora-op" role="option" tabindex="-1" data-v="00">00</li><li class="hora-op" role="option" tabindex="-1" data-v="05">05</li><li class="hora-op" role="option" tabindex="-1" data-v="10">10</li><li class="hora-op" role="option" tabindex="-1" data-v="15">15</li><li class="hora-op" role="option" tabindex="-1" data-v="20">20</li><li class="hora-op" role="option" tabindex="-1" data-v="25">25</li><li class="hora-op" role="option" tabindex="-1" data-v="30">30</li><li class="hora-op" role="option" tabindex="-1" data-v="35">35</li><li class="hora-op" role="option" tabindex="-1" data-v="40">40</li><li class="hora-op" role="option" tabindex="-1" data-v="45">45</li><li class="hora-op" role="option" tabindex="-1" data-v="50">50</li><li class="hora-op" role="option" tabindex="-1" data-v="55">55</li></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    <label for="repete">Repetir</label>
+    <select id="repete" name="repete">
+      <option value="nao">Só neste dia</option>
+      <option value="dias">Vários dias seguidos</option>
+      <option value="semanas">Toda semana (mesmo dia da semana)</option>
+    </select>
+    <div class="repete-extra" id="repete-extra" hidden>
+      <label for="qtd" id="qtd-rotulo">Quantos dias?</label>
+      <input id="qtd" name="qtd" type="number" min="1" max="31" value="3" inputmode="numeric" required>
+      <p class="resumo-repete pequeno" id="resumo-repete" aria-live="polite"></p>
+    </div>
+    <label for="turma">Turma</label>
+    <input id="turma" name="turma" maxlength="80" required placeholder="Ex.: ELE-2024A" autocomplete="off">
+    <label for="motivo">Motivo</label>
+    <input id="motivo" name="motivo" maxlength="200" required placeholder="Ex.: Aula prática de CLP" autocomplete="off">
+    <p class="pequeno">Todos os campos são obrigatórios.</p>
+    <p><button type="submit">Enviar solicitação</button></p>
+  </form>
+  <p class="pequeno">A reserva só vale depois que o administrador aprovar.</p>
+</aside>
+
+<script>
+  /* painel lateral de solicitação */
+  (function () {
+    var painel = document.getElementById('painel-solicitacao');
+    var fundo = document.getElementById('painel-fundo');
+    var abrir = document.getElementById('abrir-solicitacao');
+    var fechar = document.getElementById('fechar-solicitacao');
+
+    function abre() {
+      painel.classList.add('aberto');
+      fundo.classList.add('aberto');
+      document.body.classList.add('painel-aberto');
+      painel.setAttribute('aria-hidden', 'false');
+      abrir.setAttribute('aria-expanded', 'true');
+      var filtro = document.getElementById('filtro-lab').value;      // laboratório que está sendo visto no calendário
+      if (filtro) document.getElementById('lab-form').value = filtro;
+      var campo = document.getElementById('data');
+      var primeiro = campo.value ? document.getElementById('hi') : campo;
+      setTimeout(function () { primeiro.focus(); }, 300);
+    }
+    function fecha() {
+      painel.classList.remove('aberto');
+      fundo.classList.remove('aberto');
+      document.body.classList.remove('painel-aberto');
+      painel.setAttribute('aria-hidden', 'true');
+      abrir.setAttribute('aria-expanded', 'false');
+      abrir.focus();
+    }
+    /* horário: um campo só, com lista de horas (00 a 23) e de minutos (de 5 em 5).
+       As listas têm começo e fim (não dão a volta). O servidor recebe "HH:MM". */
+    (function () {
+      var abertos = [];
+      document.querySelectorAll('[data-hora]').forEach(function (box) {
+        var input = box.querySelector('input'), pop = box.querySelector('.hora-popup');
+        var colH = pop.querySelector('[data-col=h]'), colM = pop.querySelector('[data-col=m]');
+        var h = '', m = '';
+
+        function mostra() {
+          input.value = (h || m) ? (h || '--') + ':' + (m || '--') : '';
+          [colH, colM].forEach(function (col) {
+            var atual = col === colH ? h : m;
+            col.querySelectorAll('.hora-op').forEach(function (o) {
+              var on = o.getAttribute('data-v') === atual;
+              o.classList.toggle('sel', on);
+              o.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+          });
+        }
+        function rola() {
+          [colH, colM].forEach(function (col) {
+            var s = col.querySelector('.sel');
+            col.scrollTop = s ? s.offsetTop - col.clientHeight / 2 + s.offsetHeight / 2 : 0;
+          });
+        }
+        function fecha() { pop.hidden = true; input.setAttribute('aria-expanded', 'false'); }
+        function abre() {
+          abertos.forEach(function (f) { if (f !== fecha) f(); });
+          pop.hidden = false; input.setAttribute('aria-expanded', 'true'); rola();
+        }
+        abertos.push(fecha);
+
+        function foco(col) { var o = col.querySelector('.sel') || col.querySelector('.hora-op'); if (o) o.focus(); }
+
+        input.addEventListener('click', abre);
+        input.addEventListener('invalid', abre);                      // campo vazio ao enviar: abre a lista
+        input.addEventListener('keydown', function (ev) {
+          if (ev.key === 'Escape') { if (!pop.hidden) { fecha(); ev.stopPropagation(); } return; }   // 1º Esc fecha só a lista
+          if (ev.key === 'Enter' || ev.key === 'ArrowDown' || ev.key === ' ') { ev.preventDefault(); abre(); foco(colH); return; }
+          if (ev.key === 'Backspace' || ev.key === 'Delete') { ev.preventDefault(); h = m = ''; mostra(); return; }
+          if (ev.key.length === 1 && !ev.ctrlKey && !ev.metaKey) ev.preventDefault();   // só se escolhe pela lista
+        });
+
+        pop.addEventListener('click', function (ev) {
+          var o = ev.target.closest('.hora-op');
+          if (!o) return;
+          if (o.parentNode === colH) { h = o.getAttribute('data-v'); if (!m) m = '00'; mostra(); rola(); }
+          else { m = o.getAttribute('data-v'); mostra(); if (h) { fecha(); input.focus(); } }
+        });
+        pop.addEventListener('keydown', function (ev) {
+          var o = ev.target.closest('.hora-op');
+          if (!o) return;
+          var col = o.parentNode, outra = col === colH ? colM : colH;
+          if (ev.key === 'ArrowDown' && o.nextElementSibling) { ev.preventDefault(); o.nextElementSibling.focus(); }
+          else if (ev.key === 'ArrowUp' && o.previousElementSibling) { ev.preventDefault(); o.previousElementSibling.focus(); }
+          else if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft') { ev.preventDefault(); foco(outra); }
+          else if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); o.click(); if (col === colH) { var s = colM.querySelector('.sel'); if (s) s.focus(); } }
+          else if (ev.key === 'Escape') { ev.stopPropagation(); fecha(); input.focus(); }
+        });
+        document.addEventListener('click', function (ev) { if (!box.contains(ev.target)) fecha(); });
+        box.addEventListener('focusout', function (ev) { if (ev.relatedTarget && !box.contains(ev.relatedTarget)) fecha(); });
+      });
+    })();
+    /* repetição: vários dias seguidos ou toda semana, no mesmo horário */
+    (function () {
+      var sel = document.getElementById('repete'), extra = document.getElementById('repete-extra');
+      var qtd = document.getElementById('qtd'), rot = document.getElementById('qtd-rotulo');
+      var resumo = document.getElementById('resumo-repete'), data = document.getElementById('data');
+      function br(d) { return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2); }
+      function atualiza() {
+        var modo = sel.value;
+        extra.hidden = modo === 'nao';
+        if (modo === 'nao') return;
+        var max = modo === 'dias' ? 31 : 26;
+        qtd.max = max;
+        rot.textContent = modo === 'dias' ? 'Quantos dias seguidos? (contando o primeiro)' : 'Quantas semanas? (contando a primeira)';
+        var n = Math.max(1, Math.min(max, parseInt(qtd.value, 10) || 1));
+        if (!data.value) { resumo.textContent = 'Escolha a data de início acima.'; return; }
+        var p = data.value.split('-'), ini = new Date(+p[0], +p[1] - 1, +p[2]);
+        var fim = new Date(ini); fim.setDate(fim.getDate() + (modo === 'dias' ? n - 1 : 7 * (n - 1)));
+        var dias = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+        resumo.textContent = modo === 'dias'
+          ? n + (n === 1 ? ' dia' : ' dias') + ': de ' + br(ini) + ' a ' + br(fim) + ', no mesmo horário.'
+          : n + (n === 1 ? ' data' : ' datas') + ', toda ' + dias[ini.getDay()] + ': de ' + br(ini) + ' a ' + br(fim) + '.';
+      }
+      sel.addEventListener('change', function () { atualiza(); if (sel.value !== 'nao') qtd.focus(); });
+      qtd.addEventListener('input', atualiza); data.addEventListener('input', atualiza); data.addEventListener('change', atualiza);
+      atualiza();
+    })();
+
+    abrir.addEventListener('click', abre);
+    fechar.addEventListener('click', fecha);
+    fundo.addEventListener('click', fecha);
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && painel.classList.contains('aberto')) fecha();
+    });
+  })();
+</script>
+
+<script>
+  /* Calendário com 3 visões (semana, mês, ano). Lê as reservas de /api/eventos. Sem biblioteca externa. */
+  (function () {
+    var MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    var SEMANA = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+    var DIAS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+    var VISOES = [['semana', 'Semana'], ['mes', 'Mês'], ['ano', 'Ano']];
+    var H = 44;                                  // altura de 1 hora nas visões dia/semana (px)
+    var raiz = document.getElementById('calendario');
+    var hoje = '{{ hoje }}';
+    var hojeD = new Date(+hoje.substring(0, 4), +hoje.substring(5, 7) - 1, +hoje.substring(8, 10));
+    var foco = hojeD;                            // data que define o período mostrado
+    var visao = 'mes';
+    var filtroLab = document.getElementById('filtro-lab');
+    var labSel = '';                             // '' = todos os laboratórios; senão o id do laboratório
+    try {
+      var salvo = localStorage.getItem('labCalendario') || '';
+      if (salvo && filtroLab.querySelector('option[value="' + salvo + '"]')) { labSel = salvo; filtroLab.value = salvo; }
+    } catch (e) {}
+    var reservas = {};                           // 'AAAA-MM-DD' -> [{hi, hf, titulo, pendente}]
+    var selecionado = null;
+    var animar = 0;                              // 1 = visão nova à direita, -1 = à esquerda, 0 = sem animação
+    var hojeCheioAnt = null;                     // o botão "Hoje" estava cheio no desenho anterior? (para animar o encher/esvaziar)
+    var hojeBotao = null, hojeCheio = true;
+    var pilulaAnt = null;                        // posição da "pílula" azul dos botões Semana/Mês/Ano
+
+    function dois(n) { return (n < 10 ? '0' : '') + n; }
+    function iso(a, m, d) { return a + '-' + dois(m + 1) + '-' + dois(d); }
+    function isoD(x) { return iso(x.getFullYear(), x.getMonth(), x.getDate()); }
+    function deIso(s) { return new Date(+s.substring(0, 4), +s.substring(5, 7) - 1, +s.substring(8, 10)); }
+    function soma(x, n) { return new Date(x.getFullYear(), x.getMonth(), x.getDate() + n); }
+    function inicioSemana(x) { return soma(x, -((x.getDay() + 6) % 7)); }   // semana começa na segunda
+    function emMin(hm) { return parseInt(hm.substring(0, 2), 10) * 60 + parseInt(hm.substring(3, 5), 10); }
+    function br(s) { return s.substring(8, 10) + '/' + s.substring(5, 7) + '/' + s.substring(0, 4); }
+    function el(tag, classe, texto) {
+      var e = document.createElement(tag);
+      if (classe) e.className = classe;
+      if (texto !== undefined) e.textContent = texto;
+      return e;
+    }
+
+    /* reservas do dia, já filtradas pelo laboratório escolhido */
+    function doDia(data) {
+      return (reservas[data] || []).filter(function (r) { return !labSel || String(r.lab) === labSel; });
+    }
+    /* "Maria · Lab Maker": com todos os laboratórios à vista, mostra de qual é cada reserva */
+    function rotulo(r) { return labSel || !r.labNome ? r.titulo : r.titulo + ' · ' + r.labNome; }
+    function nomeLab() { return filtroLab.selectedIndex > 0 ? filtroLab.options[filtroLab.selectedIndex].text : ''; }
+
+    function seleciona(data) {
+      selecionado = data;
+      foco = deIso(data);
+      if (data >= hoje) document.getElementById('data').value = data;
+      desenha();
+    }
+
+    /* um mês em grade (grande na visão "mês", pequeno e clicável na visão "ano") */
+    function mes(a, m, clicavel) {
+      var caixa = el('div', 'mes');
+      var t = el('h3', clicavel ? 'clicavel' : '', MESES[m] + ' ' + a);
+      if (clicavel) {
+        t.tabIndex = 0; t.title = 'Abrir ' + MESES[m];
+        var ir = function () { foco = new Date(a, m, 1); visao = 'mes'; desenha(); };
+        t.addEventListener('click', ir);
+        t.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') ir(); });
+      }
+      caixa.appendChild(t);
+      var grade = el('div', 'mes-grade');
+      SEMANA.forEach(function (s) { grade.appendChild(el('span', 'sem', s)); });
+      var vazios = (new Date(a, m, 1).getDay() + 6) % 7;
+      for (var i = 0; i < vazios; i++) grade.appendChild(el('span', 'dia vazio'));
+      var total = new Date(a, m + 1, 0).getDate();
+      for (var d = 1; d <= total; d++) {
+        var data = iso(a, m, d);
+        var lista = doDia(data);
+        var c = 'dia';
+        if (lista.some(function (r) { return !r.pendente; })) c += ' aprovada';
+        if (lista.some(function (r) { return r.pendente; })) c += ' pendente';
+        if (data < hoje) c += ' passado';
+        if (data === hoje) c += ' hoje';
+        if (data === selecionado) c += ' sel';
+        var b = el('button', c, String(d));
+        b.type = 'button';
+        b.setAttribute('data-data', data);
+        if (lista.length) b.title = lista.map(function (r) { return r.hi + '–' + r.hf + ' ' + rotulo(r); }).join(', ');
+        b.addEventListener('click', function (ev) { seleciona(ev.currentTarget.getAttribute('data-data')); });
+        grade.appendChild(b);
+      }
+      caixa.appendChild(grade);
+      return caixa;
+    }
+
+    /* semana: uma linha por dia. À esquerda as reservas escritas (horário, nome e motivo); à direita uma barrinha do horário (07:00 às 22:30) */
+    function grade(dias) {
+      var iniM = 7 * 60, fimM = 22 * 60 + 30, total = fimM - iniM;
+      var box = el('div', 'sem');
+
+      var cab = el('div', 'sem-cab');
+      cab.appendChild(el('span', '', 'Dia'));
+      cab.appendChild(el('span', '', 'Reservas'));
+      var esc = el('div', 'sem-escala');
+      [[7, '07h'], [12, '12h'], [17, '17h'], [22.5, '22h30']].forEach(function (x) {
+        var s = el('span', '', x[1]);
+        s.style.left = ((x[0] * 60 - iniM) * 100 / total) + '%';
+        esc.appendChild(s);
+      });
+      cab.appendChild(esc);
+      box.appendChild(cab);
+
+      dias.forEach(function (d) {
+        var dt = deIso(d);
+        var linha = el('div', 'sem-linha' + (d === hoje ? ' hoje' : '') + (d === selecionado ? ' sel' : ''));
+        var b = el('button', 'sem-dia');
+        b.type = 'button';
+        b.appendChild(el('small', '', SEMANA[(dt.getDay() + 6) % 7]));
+        b.appendChild(el('strong', '', String(dt.getDate())));
+        b.addEventListener('click', function () { seleciona(d); });
+        linha.appendChild(b);
+
+        var lista = doDia(d).slice().sort(function (x, y) { return x.hi < y.hi ? -1 : 1; });
+        var itens = el('div', 'sem-itens');
+        if (!lista.length) itens.appendChild(el('span', 'sem-livre', 'Livre'));
+        lista.forEach(function (r) {
+          var it = el('div', 'sem-item ' + (r.pendente ? 'pend' : 'aprov'));
+          it.appendChild(el('strong', '', r.hi + ' – ' + r.hf));
+          it.appendChild(el('span', '', rotulo(r)));
+          if (r.motivo) it.appendChild(el('em', '', r.motivo));
+          if (r.pendente) it.title = 'Aguardando o administrador';
+          itens.appendChild(it);
+        });
+        linha.appendChild(itens);
+
+        var faixa = el('div', 'sem-faixa');
+        lista.forEach(function (r) {
+          var de = Math.max(emMin(r.hi), iniM) - iniM, ate = Math.min(emMin(r.hf), fimM) - iniM;
+          if (ate <= de) return;
+          var s = el('i', 'sem-trecho ' + (r.pendente ? 'pend' : 'aprov'));
+          s.style.left = (de * 100 / total) + '%';
+          s.style.width = Math.max((ate - de) * 100 / total, 1.5) + '%';
+          faixa.appendChild(s);
+        });
+        linha.appendChild(faixa);
+        box.appendChild(linha);
+      });
+      return box;
+    }
+
+    function detalhe() {
+      var box = el('div', 'cal-detalhe');
+      if (!selecionado) {
+        box.appendChild(el('p', 'pequeno', 'Clique em um dia para ver as reservas e preencher a data da solicitação.'));
+        return box;
+      }
+      box.appendChild(el('h3', '', 'Reservas em ' + br(selecionado) + (labSel ? ' · ' + nomeLab() : '')));
+      var lista = doDia(selecionado).slice().sort(function (a, b) { return a.hi < b.hi ? -1 : 1; });
+      if (!lista.length) {
+        box.appendChild(el('p', 'pequeno', labSel ? 'Nenhuma reserva neste dia. O laboratório está livre.' : 'Nenhuma reserva neste dia em nenhum laboratório.'));
+      } else {
+        var ul = el('ul', 'cal-lista');
+        lista.forEach(function (r) {
+          var li = el('li', r.pendente ? 'pend' : 'aprov');
+          li.appendChild(el('strong', '', r.hi + ' – ' + r.hf));
+          li.appendChild(document.createTextNode('  ' + rotulo(r)));
+          if (r.motivo) li.appendChild(el('span', 'cal-motivo', 'Motivo: ' + r.motivo));
+          ul.appendChild(li);
+        });
+        box.appendChild(ul);
+      }
+      return box;
+    }
+
+    function titulo() {
+      var a = foco.getFullYear();
+      if (visao === 'ano') return String(a);
+      var i = inicioSemana(foco), f = soma(i, 6);
+      function cm(x) { return MESES[x.getMonth()].substring(0, 3).toLowerCase(); }
+      return i.getDate() + ' ' + cm(i) + ' – ' + f.getDate() + ' ' + cm(f) + ' ' + f.getFullYear();
+    }
+
+    function desloca(n) {
+      if (visao === 'semana') foco = soma(foco, 7 * n);
+      else if (visao === 'mes') foco = new Date(foco.getFullYear(), foco.getMonth() + n, 1);
+      else foco = new Date(foco.getFullYear() + n, 0, 1);
+      desenha();
+    }
+
+    function navegacao() {
+      var m = foco.getMonth(), a = foco.getFullYear(), rot;
+      if (visao === 'semana') rot = ['Semana anterior', 'Próxima semana'];
+      else if (visao === 'mes') rot = [MESES[(m + 11) % 12], MESES[(m + 1) % 12]];
+      else rot = [String(a - 1), String(a + 1)];
+
+      var barra = el('div', 'cal-rodape');
+      var bAnt = el('button', 'cal-seta'); bAnt.type = 'button'; bAnt.title = rot[0];
+      bAnt.appendChild(el('span', 'seta', '‹')); bAnt.appendChild(el('span', 'rot', rot[0]));
+      bAnt.addEventListener('click', function () { desloca(-1); });
+
+      /* "Hoje" fica cheio só quando o que está na tela já é o período de hoje; senão fica vazio (só contorno) */
+      var noHoje = visao === 'semana' ? isoD(inicioSemana(foco)) === isoD(inicioSemana(hojeD))
+                 : visao === 'mes' ? (foco.getFullYear() === hojeD.getFullYear() && foco.getMonth() === hojeD.getMonth())
+                 : foco.getFullYear() === hojeD.getFullYear();
+      /* nasce no estado do desenho anterior; depois do desenho passa para o estado novo e o CSS anima (esvazia/enche) */
+      var bHoje = el('button', 'cal-hoje' + ((hojeCheioAnt === null ? noHoje : hojeCheioAnt) ? ' cheio' : ''), 'Hoje'); bHoje.type = 'button'; bHoje.title = 'Voltar para hoje';
+      hojeBotao = bHoje; hojeCheio = noHoje; hojeCheioAnt = noHoje;
+      bHoje.addEventListener('click', function () { foco = hojeD; desenha(); });
+
+      var bProx = el('button', 'cal-seta'); bProx.type = 'button'; bProx.title = rot[1];
+      bProx.appendChild(el('span', 'rot', rot[1])); bProx.appendChild(el('span', 'seta', '›'));
+      bProx.addEventListener('click', function () { desloca(1); });
+
+      barra.appendChild(bAnt); barra.appendChild(bHoje); barra.appendChild(bProx);
+      return barra;
+    }
+
+    /* a pílula azul desliza do botão antigo até o novo, só quando a visão muda.
+       Em qualquer outro redesenho (trocar de mês, carregar reservas...) ela já nasce no lugar certo, sem animar. */
+    function posicionaPilula(deslizar) {
+      var pilula = raiz.querySelector('.cal-pilula'), botao = raiz.querySelector('.cal-visao.ativo');
+      if (!pilula || !botao) return;
+      function aplica(l, w) { pilula.style.width = w + 'px'; pilula.style.transform = 'translateX(' + l + 'px)'; }
+      var l = botao.offsetLeft, w = botao.offsetWidth;
+      var ant = pilulaAnt;
+      pilulaAnt = { l: l, w: w };
+      if (deslizar && ant && (ant.l !== l || ant.w !== w)) {
+        aplica(ant.l, ant.w);
+        void pilula.offsetWidth;            // fixa a posição antiga antes de ligar a transição
+        pilula.classList.add('pronta');
+        aplica(l, w);
+      } else {
+        aplica(l, w);
+        void pilula.offsetWidth;
+        pilula.classList.add('pronta');
+      }
+    }
+
+    /* altura suave: o calendário é refeito do zero a cada ação, então medimos a altura de antes e deixamos
+       a caixa crescer ou encolher até a altura nova (meses com 4, 5 ou 6 linhas, semana, ano...) */
+    var reduzMov = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function limpaAltura() {
+      raiz.style.transition = ''; raiz.style.height = ''; raiz.style.overflow = '';
+    }
+    raiz.addEventListener('transitionend', function (ev) {
+      if (ev.target === raiz && ev.propertyName === 'height') limpaAltura();
+    });
+    function animaAltura(antes) {
+      if (!antes || reduzMov) return;
+      var depois = raiz.offsetHeight;               // altura natural do novo desenho
+      if (Math.abs(depois - antes) < 2) return;
+      raiz.style.overflow = 'hidden';
+      raiz.style.height = antes + 'px';
+      void raiz.offsetHeight;                       // fixa a altura antiga antes de ligar a transição
+      raiz.style.transition = 'height .4s cubic-bezier(.22, .8, .24, 1)';
+      raiz.style.height = depois + 'px';
+    }
+
+    function desenha() {
+      var sentido = animar; animar = 0;
+      var antes = raiz.querySelector('.cal-topo') ? raiz.offsetHeight : 0;   // 0 no primeiro desenho (ainda "Carregando…")
+      limpaAltura();
+      raiz.textContent = '';
+
+      var topo = el('div', 'cal-topo');
+      var vis = el('div', 'cal-visoes');
+      vis.setAttribute('role', 'group'); vis.setAttribute('aria-label', 'Modo de visualização');
+      var pilula = el('span', 'cal-pilula'); pilula.setAttribute('aria-hidden', 'true');
+      vis.appendChild(pilula);
+      var botaoAtivo = null;
+      VISOES.forEach(function (v, idx) {
+        var b = el('button', 'cal-visao' + (v[0] === visao ? ' ativo' : ''), v[1]);
+        b.type = 'button'; b.setAttribute('aria-pressed', v[0] === visao ? 'true' : 'false');
+        if (v[0] === visao) botaoAtivo = b;
+        b.addEventListener('click', function () {
+          if (v[0] === visao) return;
+          var antes = VISOES.map(function (x) { return x[0]; }).indexOf(visao);
+          animar = idx > antes ? 1 : -1;
+          visao = v[0];
+          desenha();
+        });
+        vis.appendChild(b);
+      });
+      topo.appendChild(vis);
+
+      var leg = el('div', 'cal-legenda');
+      [['aprovada', 'Aprovado'], ['pendente', 'Aguardando o administrador'], ['hoje', 'Hoje']].forEach(function (x) {
+        var item = el('span', 'cal-leg');
+        item.appendChild(el('i', 'bolinha ' + x[0]));
+        item.appendChild(document.createTextNode(x[1]));
+        leg.appendChild(item);
+      });
+      topo.appendChild(leg);
+      raiz.appendChild(topo);
+
+      if (visao !== 'mes') raiz.appendChild(el('h2', 'cal-titulo', titulo()));
+
+      var lay = el('div', 'cal-layout');   // calendário à esquerda, reservas do dia à direita
+      var main = el('div', 'cal-main' + (sentido ? (sentido > 0 ? ' desliza-dir' : ' desliza-esq') : ''));
+      if (visao === 'mes') {
+        var u = el('div', 'cal-anual cal-unico');
+        u.appendChild(mes(foco.getFullYear(), foco.getMonth(), false));
+        main.appendChild(u);
+      } else if (visao === 'ano') {
+        var g = el('div', 'cal-anual');
+        for (var m = 0; m < 12; m++) g.appendChild(mes(foco.getFullYear(), m, true));
+        main.appendChild(g);
+      } else if (visao === 'semana') {
+        var ini = inicioSemana(foco), ds = [];
+        for (var k = 0; k < 7; k++) ds.push(isoD(soma(ini, k)));
+        main.appendChild(grade(ds));
+      }
+      main.appendChild(navegacao());
+      lay.appendChild(main);
+      lay.appendChild(detalhe());
+      raiz.appendChild(lay);
+      posicionaPilula(sentido !== 0);
+      animaAltura(antes);
+      if (hojeBotao) { void hojeBotao.offsetWidth; hojeBotao.classList.toggle('cheio', hojeCheio); }
+    }
+
+    filtroLab.addEventListener('change', function () {
+      labSel = filtroLab.value;
+      try { localStorage.setItem('labCalendario', labSel); } catch (e) {}
+      desenha();
+    });
+
+    desenha();
+    fetch('{{ url_for("api_eventos") }}', { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (lista) {
+        lista.forEach(function (e) {
+          var dia = e.start.substring(0, 10);
+          (reservas[dia] = reservas[dia] || []).push({
+            hi: e.start.substring(11, 16),
+            hf: e.end.substring(11, 16),
+            titulo: e.title.replace(' (pendente)', ''),
+            lab: e.lab,
+            labNome: e.lab_nome || '',
+            motivo: e.motivo || (e.extendedProps && e.extendedProps.motivo) || '',
+            pendente: e.title.indexOf('(pendente)') !== -1
+          });
+        });
+        desenha();
+      })
+      .catch(function () {
+        raiz.appendChild(el('p', 'pequeno', 'Não foi possível carregar as reservas. Recarregue a página.'));
+      });
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block titulo %}Laboratórios{% endblock %}
+{% block conteudo %}
+<div class="card">
+  <div class="labs-topo">
+    <h1>Laboratórios</h1>
+    <button type="button" id="abrir-lab" aria-controls="painel-lab" aria-expanded="false">Adicionar Laboratório</button>
+  </div>
+  <p class="pequeno">Aqui ficam os laboratórios que os instrutores podem reservar. Você pode mudar o nome, desativar um laboratório ou cadastrar um novo.</p>
+  {% if lista %}
+  <table class="tab-labs">
+    <tr><th>ID</th><th>Nome</th><th>Situação</th><th></th></tr>
+    {% for l in lista %}
+    <tr class="{{ 'inativo' if not l['ativo'] }}" data-lab="{{ l['id'] }}">
+      {% if l['ativo'] %}
+      <td data-label="ID">
+        <input class="dado" form="form-lab{{ l['id'] }}" name="codigo" value="{{ l['codigo'] }}"
+               data-original="{{ l['codigo'] }}" maxlength="20" pattern="[A-Za-z0-9_\-]{1,20}"
+               title="Letras, números, hífen e sublinhado (sem espaços)" readonly required autocomplete="off" aria-label="ID do laboratório">
+      </td>
+      <td data-label="Nome">
+        <input class="dado" form="form-lab{{ l['id'] }}" name="nome" value="{{ l['nome'] }}"
+               data-original="{{ l['nome'] }}" maxlength="80" readonly required autocomplete="off" aria-label="Nome do laboratório">
+      </td>
+      <td data-label="Situação" class="status-aprovada">Ativo</td>
+      <td class="acoes">
+        <form id="form-lab{{ l['id'] }}" class="inline" method="post" action="{{ url_for('editar_laboratorio', lid=l['id']) }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+        </form>
+        <button type="button" class="btn-editar">Editar</button>
+        <button type="submit" class="btn-salvar" form="form-lab{{ l['id'] }}" hidden>Salvar</button>
+        <form class="inline form-desativar" method="post" action="{{ url_for('alterna_laboratorio', lid=l['id']) }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="cinza" type="submit">Desativar</button>
+        </form>
+        <button type="button" class="cinza btn-cancelar" hidden>Cancelar</button>
+      </td>
+      {% else %}
+      <td data-label="ID"><input class="dado" value="{{ l['codigo'] }}" disabled aria-label="ID do laboratório (desativado)"></td>
+      <td data-label="Nome"><input class="dado" value="{{ l['nome'] }}" disabled aria-label="Nome do laboratório (desativado)"></td>
+      <td data-label="Situação" class="status-negada">Desativado</td>
+      <td class="acoes">
+        <form class="inline" method="post" action="{{ url_for('alterna_laboratorio', lid=l['id']) }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit">Ativar</button>
+        </form>
+        <form class="inline" method="post" action="{{ url_for('apagar_laboratorio', lid=l['id']) }}"
+              onsubmit="return confirm('Apagar {{ l['nome']|e }} definitivamente? As reservas desse laboratório também serão apagadas e o histórico de acessos fica sem o nome dele. Não dá para desfazer.');">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="vermelho" type="submit">Apagar</button>
+        </form>
+      </td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p>Nenhum laboratório cadastrado. Use o botão "Adicionar Laboratório".</p>
+  {% endif %}
+</div>
+
+<!-- painel que desliza da direita para a esquerda -->
+<div class="painel-fundo" id="painel-fundo"></div>
+<aside class="painel" id="painel-lab" role="dialog" aria-modal="true" aria-labelledby="painel-lab-titulo" aria-hidden="true">
+  <div class="painel-topo">
+    <h2 id="painel-lab-titulo">Adicionar laboratório</h2>
+    <button type="button" class="painel-fechar" id="fechar-lab" aria-label="Fechar painel">✕</button>
+  </div>
+  <form method="post" action="{{ url_for('admin_laboratorios') }}" autocomplete="off">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="novo-lab">Nome</label>
+    <input id="novo-lab" name="nome" maxlength="80" required placeholder="Ex.: Laboratório de Robótica">
+    <label for="novo-codigo">ID <span class="opcional">(opcional)</span></label>
+    <input id="novo-codigo" name="codigo" maxlength="20" pattern="[A-Za-z0-9_\-]{1,20}"
+           title="Letras, números, hífen e sublinhado (sem espaços)" placeholder="Ex.: ROBOTICA ou 9 (se vazio, é automático)">
+    <p><button type="submit">Adicionar</button></p>
+  </form>
+</aside>
+{% endblock %}
+{% block scripts %}
+<script>
+  /* Editar -> libera ID e nome; Salvar grava; Cancelar volta ao que estava */
+  document.querySelectorAll('tr[data-lab]').forEach(function (tr) {
+    var editar = tr.querySelector('.btn-editar');
+    if (!editar) return;                                   // laboratório desativado: não edita
+    var salvar = tr.querySelector('.btn-salvar'), cancelar = tr.querySelector('.btn-cancelar');
+    var desativar = tr.querySelector('.form-desativar');
+    var campos = tr.querySelectorAll('input[data-original]');
+
+    function modo(editando) {
+      campos.forEach(function (c) { if (editando) c.removeAttribute('readonly'); else c.setAttribute('readonly', ''); });
+      tr.classList.toggle('editando', editando);
+      editar.hidden = editando;
+      desativar.hidden = editando;
+      salvar.hidden = !editando;
+      cancelar.hidden = !editando;
+    }
+    editar.addEventListener('click', function () {
+      modo(true);
+      var nome = tr.querySelector('input[name=nome]');
+      nome.focus(); nome.select();
+    });
+    cancelar.addEventListener('click', function () {
+      campos.forEach(function (c) { c.value = c.getAttribute('data-original'); });
+      modo(false);
+      editar.focus();
+    });
+    campos.forEach(function (c) {
+      c.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') cancelar.click(); });
+    });
+  });
+
+  /* painel "Adicionar Laboratório" */
+  (function () {
+    var painel = document.getElementById('painel-lab'), fundo = document.getElementById('painel-fundo');
+    var abrir = document.getElementById('abrir-lab'), fechar = document.getElementById('fechar-lab');
+    function abre() {
+      painel.classList.add('aberto'); fundo.classList.add('aberto'); document.body.classList.add('painel-aberto');
+      painel.setAttribute('aria-hidden', 'false'); abrir.setAttribute('aria-expanded', 'true');
+      setTimeout(function () { document.getElementById('novo-lab').focus(); }, 300);
+    }
+    function fecha() {
+      painel.classList.remove('aberto'); fundo.classList.remove('aberto'); document.body.classList.remove('painel-aberto');
+      painel.setAttribute('aria-hidden', 'true'); abrir.setAttribute('aria-expanded', 'false');
+      abrir.focus();
+    }
+    abrir.addEventListener('click', abre);
+    fechar.addEventListener('click', fecha);
+    fundo.addEventListener('click', fecha);
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && painel.classList.contains('aberto')) fecha();
+    });
+  })();
+</script>
+{% endblock %}

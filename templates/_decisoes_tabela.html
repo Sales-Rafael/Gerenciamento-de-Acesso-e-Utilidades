@@ -1,0 +1,37 @@
+<div class="logs-topo">
+  <p class="pequeno"><strong>{{ decisoes|length }}</strong> {{ 'reserva' if decisoes|length == 1 else 'reservas' }}{% if filtros['pessoa'] or filtros['de'] or filtros['ate'] or filtros['lab'] %} com o filtro aplicado{% endif %}. A lista se atualiza sozinha.</p>
+  <div class="logs-botoes">
+  {% if decisoes %}
+  <a class="btn btn-pdf" href="{{ url_for('baixar_decisoes_pdf', pessoa=filtros['pessoa'] or None, de=filtros['de'] or None, ate=filtros['ate'] or None, lab=filtros['lab'] or None) }}" data-arquivo>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+    Baixar PDF{% if filtros['pessoa'] or filtros['de'] or filtros['ate'] or filtros['lab'] %} (filtrado){% endif %}
+  </a>
+  <form class="inline" method="post" action="{{ url_for('apagar_decisoes') }}"
+        onsubmit="return confirm('Apagar TODO o histórico de decisões (não só o que está filtrado)? As reservas apagadas também somem de \'Minhas reservas\' dos instrutores. Reservas aprovadas que ainda não aconteceram são mantidas. Não dá para desfazer.');">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="vermelho" type="submit">Apagar todo o histórico</button>
+  </form>
+  {% endif %}
+  </div>
+</div>
+{% if decisoes %}
+<table>
+  <tr><th>Instrutor</th><th>Laboratório</th><th>Data</th><th>Horário</th><th>Turma</th><th>Situação</th><th>Histórico</th></tr>
+  {% for r in decisoes %}
+  <tr>
+    <td data-label="Instrutor">{{ r['nome'] }}</td>
+    <td data-label="Laboratório">{{ r['lab_nome'] or '—' }}</td>
+    <td data-label="Data">{{ r['data']|data_br }}</td>
+    <td data-label="Horário">{{ r['hora_inicio'] }} – {{ r['hora_fim'] }}</td>
+    <td data-label="Turma">{{ r['turma'] or '—' }}</td>
+    <td data-label="Situação" class="status-{{ r['status'] }}">{{ r['status']|capitalize }}</td>
+    <td data-label="Histórico">{% for rotulo, nome, quando in r|historico %}<div>{{ rotulo }} por <strong>{{ nome }}</strong>{% if quando %} <span class="quando">{{ quando|dh_br }}</span>{% endif %}</div>{% endfor %}</td>
+  </tr>
+  {% if r['motivo_recusa'] %}
+  <tr class="linha-balao"><td colspan="7"><div class="balao balao-motivo"><strong>Motivo informado</strong><p>{{ r['motivo_recusa'] }}</p></div></td></tr>
+  {% endif %}
+  {% endfor %}
+</table>
+{% else %}
+<p>{% if filtros['pessoa'] or filtros['de'] or filtros['ate'] or filtros['lab'] %}Nenhuma decisão encontrada com esse filtro.{% else %}Nenhuma decisão registrada ainda.{% endif %}</p>
+{% endif %}

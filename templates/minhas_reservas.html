@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block titulo %}Minhas reservas{% endblock %}
+{% block conteudo %}
+<div class="card">
+  <h1>Minhas reservas</h1>
+  {% set n_novos = reservas|rejectattr('visto')|list|length %}
+  {% if n_novos %}
+  <div class="aviso-novidade" role="status">
+    <strong>{{ n_novos }} {{ 'solicitação foi atualizada' if n_novos == 1 else 'solicitações foram atualizadas' }}</strong> pelo administrador desde a sua última visita. Elas estão marcadas com <span class="tag-novo">Novo</span>.
+  </div>
+  {% endif %}
+  {% if reservas %}
+  <div class="logs-topo">
+    <p class="pequeno">Todas as suas solicitações, com a situação de cada uma.</p>
+  </div>
+  <table>
+    <tr><th>Laboratório</th><th>Data</th><th>Horário</th><th>Turma</th><th>Motivo</th><th>Situação</th><th></th></tr>
+    {% for r in reservas %}
+    <tr class="linha-anim{{ ' tem-balao' if r['motivo_recusa'] and r['status'] in ('negada', 'cancelada') else '' }}{{ ' novo' if not r['visto'] else '' }}">
+      <td data-label="Laboratório">{{ r['lab_nome'] or '—' }}</td>
+      <td data-label="Data">{{ r['data'][8:10] }}/{{ r['data'][5:7] }}/{{ r['data'][0:4] }}</td>
+      <td data-label="Horário">{{ r['hora_inicio'] }} – {{ r['hora_fim'] }}</td>
+      <td data-label="Turma">{{ r['turma'] or '—' }}</td>
+      <td data-label="Motivo">{{ r['motivo'] or '—' }}</td>
+      <td data-label="Situação" class="status-{{ r['status'] }}">{{ r['status']|capitalize }}{% if not r['visto'] %} <span class="tag-novo">Novo</span>{% endif %}
+        {% for rotulo, nome, quando in r|historico %}<small class="quem">{{ rotulo }} por {{ nome }}{% if quando %} · {{ quando|dh_br }}{% endif %}</small>{% endfor %}</td>
+      <td>
+        {% if r['status'] in ('pendente', 'aprovada') and r|passou %}
+        <div class="acao-fim">
+          <span class="pequeno">{{ 'Finalizada' if r['status'] == 'aprovada' else 'Expirada' }}</span>
+          <form class="inline" method="post" action="{{ url_for('apagar_reserva', rid=r['id']) }}"
+                onsubmit="return confirm('Apagar esta solicitação do seu histórico? Não dá para desfazer.');">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button class="x-apagar" type="submit" title="Apagar do histórico" aria-label="Apagar do histórico"><svg class="icone-x" width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8"/></svg></button>
+          </form>
+        </div>
+        {% elif r['status'] in ('pendente', 'aprovada') %}
+        <form class="inline" method="post" action="{{ url_for('cancelar_reserva', rid=r['id']) }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="cinza" type="submit">Cancelar</button>
+        </form>
+        {% elif r['status'] in ('negada', 'cancelada') %}
+        <div class="acao-fim">
+          <form class="inline" method="post" action="{{ url_for('apagar_reserva', rid=r['id']) }}"
+                onsubmit="return confirm('Apagar esta solicitação do seu histórico? Não dá para desfazer.');">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button class="x-apagar" type="submit" title="Apagar do histórico" aria-label="Apagar do histórico"><svg class="icone-x" width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8"/></svg></button>
+          </form>
+        </div>
+        {% endif %}
+      </td>
+    </tr>
+    {% if r['status'] in ('negada', 'cancelada') and r['motivo_recusa'] %}
+    <tr class="linha-balao{{ ' novo' if not r['visto'] else '' }}">
+      <td colspan="7">
+        <div class="balao balao-motivo" role="note">
+          <strong>{{ 'Motivo da recusa' if r['status'] == 'negada' else 'Aviso do administrador' }}</strong>
+          <p>{{ r['motivo_recusa'] }}</p>
+        </div>
+      </td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+  </table>
+  {% else %}
+    <p>Você ainda não fez nenhuma solicitação.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block titulo %}Usuários e crachás{% endblock %}
+{% block conteudo %}
+<div class="card">
+  <h1>Usuários e crachás</h1>
+  <table class="tab-usuarios">
+    <tr><th>Nome</th><th>E-mail</th><th>Nível</th><th>UID do crachá</th><th></th></tr>
+    {% for u in usuarios %}
+    <tr class="{{ 'inativo' if not u['ativo'] }}" data-usuario="{{ u['id'] }}">
+      <td data-label="Nome">
+        <span class="v dado">{{ u['nome'] }}</span>
+        {% if u['ativo'] %}<input class="e" form="form-u{{ u['id'] }}" name="nome" value="{{ u['nome'] }}"
+               maxlength="120" required hidden autocomplete="off" aria-label="Nome">{% endif %}
+      </td>
+      <td data-label="E-mail">
+        <span class="v dado">{{ u['email'] }}</span>
+        {% if u['ativo'] %}<input class="e" form="form-u{{ u['id'] }}" name="email" type="email" value="{{ u['email'] }}"
+               required hidden autocomplete="off" aria-label="E-mail">
+        <input class="e" form="form-u{{ u['id'] }}" name="senha" type="password" minlength="6" hidden
+               autocomplete="new-password" placeholder="Nova senha (opcional)" aria-label="Nova senha (deixe em branco para manter)"
+               title="Preencha só se quiser redefinir a senha desta pessoa">{% endif %}
+      </td>
+      <td data-label="Nível">
+        <span class="v dado">{{ u['nivel']|nivel_nome }}</span>
+        {% if u['ativo'] and u['id'] != user['id'] %}
+        <select class="e" form="form-u{{ u['id'] }}" name="nivel" hidden aria-label="Nível">
+          <option value="instrutor" {{ 'selected' if u['nivel'] == 'instrutor' }}>Instrutor</option>
+          <option value="adm" {{ 'selected' if u['nivel'] == 'adm' }}>Administrador</option>
+        </select>
+        {% endif %}
+      </td>
+      <td data-label="UID do crachá">
+        <div class="linha">
+          {% if u['ativo'] %}
+          {% if not u['uid_cracha'] %}<span class="tag-pendente v" title="Este usuário ainda não tem crachá vinculado. Clique em Editar para cadastrar o UID.">Pendente de cadastro</span>{% endif %}
+          <input class="uid-campo dado{{ '' if u['uid_cracha'] else ' e' }}" form="form-u{{ u['id'] }}" name="uid" value="{{ u['uid_cracha'] or '' }}"
+                 placeholder="04 A1 B2 C3" readonly autocomplete="off" aria-label="UID do crachá"{% if not u['uid_cracha'] %} hidden{% endif %}>
+          <button type="button" class="btn-editar">Editar</button>
+          <button type="submit" class="btn-salvar" form="form-u{{ u['id'] }}" hidden>Salvar</button>
+          {% else %}
+          {% if not u['uid_cracha'] %}<span class="tag-pendente" title="Este usuário não tinha crachá vinculado.">Pendente de cadastro</span>{% endif %}
+          <input class="uid-campo dado" value="{{ u['uid_cracha'] or '' }}" placeholder="04 A1 B2 C3"
+                 disabled aria-label="UID do crachá (usuário desativado)"{% if not u['uid_cracha'] %} hidden{% endif %}>
+          <form class="inline" method="post" action="{{ url_for('alterna_ativo', uid_user=u['id']) }}">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit">Reativar</button>
+          </form>
+          {% endif %}
+        </div>
+      </td>
+      <td class="acoes">
+        {% if u['ativo'] %}
+        <form id="form-u{{ u['id'] }}" class="inline" method="post" action="{{ url_for('editar_usuario', uid_user=u['id']) }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+        </form>
+        <form class="inline" method="post" action="{{ url_for('alterna_ativo', uid_user=u['id']) }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="cinza" type="submit">Desativar</button>
+        </form>
+        {% else %}
+        <form class="inline" method="post" action="{{ url_for('apagar_usuario', uid_user=u['id']) }}"
+              onsubmit="return confirm('Apagar {{ u['nome']|e }} definitivamente? As reservas dele também serão apagadas. Não dá para desfazer.');">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="vermelho" type="submit">Apagar</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>Crachás lidos que ainda não têm dono</h2>
+  <p class="pequeno">Peça para a pessoa encostar o crachá na porta. O código aparece aqui sozinho; copie e cole no campo do usuário.</p>
+  <div id="desconhecidos-conteudo" data-v="{{ versao_desc }}">{{ parcial_desc|safe }}</div>
+</div>
+
+<div class="card">
+  <h2>Novo usuário</h2>
+  <form method="post" id="form-novo" autocomplete="off">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="linha">
+      <div style="flex:1"><label for="novo-nome">Nome</label><input id="novo-nome" name="nome" required autocomplete="off" placeholder="Digite o nome"></div>
+      <div style="flex:1"><label for="novo-email">E-mail</label><input id="novo-email" name="email" type="email" required autocomplete="off" placeholder="Digite o e-mail"></div>
+    </div>
+    <div class="linha">
+      <div style="flex:1"><label for="novo-senha">Senha inicial (mín. 6)</label><input id="novo-senha" name="senha" type="password" required autocomplete="new-password" placeholder="Digite a senha inicial"></div>
+      <div style="flex:1"><label for="novo-nivel">Nível</label>
+        <select id="novo-nivel" name="nivel" required><option value="" disabled selected hidden>Selecione o nível</option><option value="instrutor">Instrutor</option><option value="adm">Administrador</option></select></div>
+      <div style="flex:1"><label for="novo-uid">UID do crachá (opcional)</label><input id="novo-uid" name="uid" placeholder="Digite o UID do crachá (ex.: 04 A1 B2 C3)" autocomplete="off"></div>
+    </div>
+    <p><button type="submit">Criar usuário</button></p>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>ligaAtualizacao('desconhecidos-conteudo', '{{ url_for("parcial_desconhecidos") }}', 2000);</script>
+<script>
+  /* Editar -> libera nome, e-mail e UID e troca o botão por "Salvar" */
+  document.querySelectorAll('tr[data-usuario]').forEach(function (tr) {
+    var editar = tr.querySelector('.btn-editar');
+    if (!editar) return;
+    var salvar = tr.querySelector('.btn-salvar');
+    editar.addEventListener('click', function () {
+      tr.querySelectorAll('.v').forEach(function (el) { el.hidden = true; });
+      tr.querySelectorAll('.e').forEach(function (el) { el.hidden = false; });
+      tr.querySelector('.uid-campo').removeAttribute('readonly');
+      tr.classList.add('editando');
+      editar.hidden = true;
+      salvar.hidden = false;
+      var nome = tr.querySelector('input[name=nome]');
+      nome.focus(); nome.select();
+    });
+  });
+
+  /* "Novo usuário": todos os campos começam vazios, mesmo com senhas salvas no navegador */
+  (function () {
+    var form = document.getElementById('form-novo');
+    var campos = form.querySelectorAll('input:not([type=hidden])');
+    campos.forEach(function (c) {
+      c.setAttribute('readonly', '');                       // navegador não preenche campo somente-leitura
+      c.addEventListener('focus', function () { c.removeAttribute('readonly'); });
+      ['keydown', 'paste'].forEach(function (ev) {
+        c.addEventListener(ev, function () { c.setAttribute('data-digitado', '1'); });
+      });
+    });
+    function limpa() {
+      campos.forEach(function (c) { if (!c.getAttribute('data-digitado') && c.value) c.value = ''; });
+    }
+    [0, 150, 500, 1200, 2500].forEach(function (t) { setTimeout(limpa, t); });
+    window.addEventListener('pageshow', limpa);             // ao voltar pelo botão "voltar" do navegador
+  })();
+</script>
+{% endblock %}

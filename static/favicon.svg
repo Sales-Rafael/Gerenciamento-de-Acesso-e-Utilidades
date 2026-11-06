@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Cadeado azul">
+  <path d="M20 29V21a12 12 0 0 1 24 0v8" fill="none" stroke="#0b4a8f" stroke-width="7" stroke-linecap="round"/>
+  <rect x="10" y="28" width="44" height="30" rx="7" fill="#0b4a8f"/>
+  <circle cx="32" cy="41" r="4.6" fill="#fff"/>
+  <rect x="29.6" y="43" width="4.8" height="9" rx="2.4" fill="#fff"/>
+</svg>
