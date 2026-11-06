@@ -1,15 +1,33 @@
-# Projeto Gau — Gestão de Acesso e Utilidades (Flask + SQLite + ESP32)
+# Projeto Gau — Gestão de Acesso e Utilidades
 
-Site com calendário e login (instrutor / administrador) e a API que os ESP32 consultam
-para destrancar as portas. Funciona com vários laboratórios (sem limite):
-cada laboratório tem a sua porta, com o seu ESP32.
+Sistema de controle de acesso e reserva de laboratórios. Os instrutores pedem a reserva
+em um site com calendário, o administrador aprova, e no horário aprovado o **crachá RFID**
+do instrutor destranca a porta do laboratório reservado, usando um **ESP32**.
 
-O servidor roda em um **notebook** na mesma rede Wi-Fi dos ESP32. Os instrutores acessam
-o site pelo navegador (computador, tablet ou celular) usando o IP do notebook.
+**Tecnologias:** Python (Flask) · SQLite · ESP32 (Arduino) · leitor RFID RC522
 
-## 1. Rodar no notebook
+## Como funciona
 
-Requisitos: Python 3 instalado.
+1. O **administrador** cadastra os instrutores e vincula o crachá de cada um.
+2. O **instrutor** entra no site, escolhe laboratório, data e horário e envia a solicitação.
+3. O administrador **aprova ou nega** a solicitação.
+4. No horário aprovado, o instrutor encosta o crachá no leitor da porta. O ESP32 consulta
+   o servidor, e se houver reserva aprovada para aquele laboratório, a fechadura é acionada.
+5. Cada tentativa (liberada ou negada) fica registrada no histórico de acessos.
+
+Funciona com **vários laboratórios**, sem limite: cada laboratório tem a sua porta e o seu ESP32.
+A reserva de um laboratório não abre a porta de outro.
+
+## Requisitos
+
+- Python 3 instalado no computador que será o servidor
+- Um ESP32 por porta, com leitor RC522, relé (ou fechadura), LEDs e buzzer
+- ESP32 e servidor na **mesma rede Wi-Fi** (o ESP32 só enxerga redes de 2,4 GHz)
+- Arduino IDE (ou similar) com suporte ao ESP32 e as bibliotecas **MFRC522** e **ArduinoJson**
+
+## 1. Instalar o servidor
+
+O servidor roda em um notebook/computador na rede dos ESP32.
 
 **Windows (cmd):**
 
@@ -18,8 +36,6 @@ cd "Projeto Gau"
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
-python criar_admin.py
-python app.py
 ```
 
 **Linux / macOS:**
@@ -29,80 +45,77 @@ cd "Projeto Gau"
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+```
+
+## 2. Criar o primeiro usuário (administrador)
+
+O sistema **não vem com nenhum usuário**, e o site não tem tela de cadastro aberta.
+O primeiro administrador é criado pelo terminal, com o script `criar_admin.py`.
+Com o ambiente virtual ativo, dentro da pasta do projeto, rode:
+
+```bash
 python criar_admin.py
+```
+
+Ele pergunta três coisas:
+
+| Pergunta | O que digitar |
+|---|---|
+| `Nome:` | Nome do administrador |
+| `E-mail:` | E-mail que será usado para entrar no site |
+| `Senha (mín. 6 caracteres):` | Senha (não aparece enquanto você digita) |
+
+Se tudo der certo, aparece **"Administrador criado com sucesso."**
+Se aparecer "Já existe um usuário com esse e-mail.", esse e-mail já foi cadastrado.
+
+Na primeira execução, o banco de dados (`acesso.db`) e as chaves (`secret.key` e `api.key`)
+também são criados automaticamente, e os laboratórios iniciais são cadastrados.
+
+Para criar **outro administrador** depois, rode o `criar_admin.py` de novo com outro e-mail.
+
+## 3. Iniciar o servidor
+
+```bash
 python app.py
 ```
 
-O site abre em `http://localhost:5000` no próprio notebook e em `http://IP_DO_NOTEBOOK:5000`
-nos outros aparelhos da rede.
+No Windows, também dá para dar dois cliques no `iniciar.bat` (ele precisa do `venv` já criado).
 
-Na primeira execução são criados: `acesso.db` (banco), `secret.key` e `api.key`.
-A **chave da API** que o ESP32 usa está em `api.key`: copie o conteúdo para a
-constante `API_KEY` do código do ESP32.
+O site abre em `http://localhost:5000` no próprio computador, e em
+`http://IP_DO_COMPUTADOR:5000` nos outros aparelhos da rede (celular, tablet, outro PC).
 
-> **Importante:** `acesso.db`, `secret.key` e `api.key` contêm dados e segredos reais.
-> Nunca envie esses arquivos para o GitHub.
+Entre com o **e-mail e a senha** do administrador criado no passo anterior.
 
-## 2. Deixar o notebook funcionando como servidor
+## 4. Cadastrar os instrutores e os crachás
 
-1. **IP fixo.** O ESP32 acessa o servidor pelo IP do notebook, então ele não pode mudar.
-   Descubra o IP com `ipconfig` (linha *IPv4*) e peça ao TI (ou configure no roteador)
-   para reservar esse IP para o notebook.
-2. **Firewall do Windows.** Na primeira vez que o `app.py` rodar, o Windows pergunta se
-   deseja permitir o acesso: marque **Rede privada** e permita. Se não apareceu a pergunta
-   (ou o ESP32 não consegue conectar), libere a porta 5000 abrindo o cmd como administrador:
+Depois de entrar como administrador:
 
-   ```bat
-   netsh advfirewall firewall add rule name="Projeto Gau" dir=in action=allow protocol=TCP localport=5000
-   ```
-3. **Mesma rede.** O notebook e os ESP32 precisam estar na mesma rede. Algumas redes
-   (escolas, empresas) isolam os aparelhos entre si; se for o caso, peça ao TI para liberar
-   a comunicação entre eles.
-4. **Notebook ligado e acordado.** Se ele dormir ou desligar, as portas deixam de abrir.
-   Em *Configurações > Sistema > Energia*, desative a suspensão enquanto estiver na tomada.
-5. **Horário certo.** As reservas dependem da data e hora do notebook. Confira se o
-   relógio e o fuso (Brasília) estão corretos.
-6. **Em uso real, desligue o modo debug.** Na última linha do `app.py`, troque
-   `debug=True` por `debug=False`.
+1. Abra **Usuários e crachás** e use **Criar usuário**. Informe nome, e-mail, senha
+   (mínimo 6 caracteres) e o nível: **instrutor** ou **adm**.
+2. Passe o e-mail e a senha para a pessoa. Ela entra no site e pode trocar a senha em **Meu perfil**.
+3. Para vincular o crachá, descubra o **UID** dele: a pessoa encosta o crachá no leitor da porta.
+   O UID aparece em **"Crachás lidos que ainda não têm dono"**. Copie e cole no cadastro do usuário
+   (formato `04 A1 B2 C3`).
+4. Na mesma tela dá para editar, desativar, reativar e apagar usuários.
 
-### Iniciar o servidor sempre que precisar
+## 5. Laboratórios
 
-Depois da instalação, basta abrir o cmd na pasta do projeto e rodar:
+Na primeira execução são criados: Informática 101, Informática 104, Laboratório 4.0,
+Laboratório Maker, Eletrônica, Elétrica Predial, Elétrica Industrial e Pneumática.
 
-```bat
-venv\Scripts\activate
-python app.py
-```
+Em **Laboratórios** o administrador adiciona, edita, desativa, ativa e apaga laboratórios.
+Cada um tem um **ID** (letras e/ou números). Esse ID é o `LAB_ID` do código do ESP32 daquela porta;
+se mudar o ID no site, mude também no ESP32.
 
-Se quiser um atalho, crie um arquivo `iniciar.bat` na pasta do projeto com:
+## 6. Reservas
 
-```bat
-@echo off
-cd /d "%~dp0"
-call venv\Scripts\activate
-python app.py
-pause
-```
+- **Instrutor:** em **Calendário** escolhe o laboratório, a data (pode ser mais de um dia seguido),
+  o horário e a turma, e envia a solicitação. Acompanha tudo em **Minhas reservas** e pode cancelar.
+- **Administrador:** em **Solicitações** aprova ou nega (com explicação opcional).
+  Os históricos ficam em **Histórico de decisões** e **Histórico de acessos**, e os dois podem ser
+  baixados em **PDF**.
 
-Para iniciar junto com o Windows, coloque um atalho desse arquivo na pasta de inicialização
-(`Win + R`, digite `shell:startup`).
-
-## 3. Fluxo de uso
-
-0. Na primeira execução os laboratórios já são criados (Informática 101, Informática 104,
-   Laboratório 4.0, Maker, Eletrônica, Elétrica Predial, Elétrica Industrial e Pneumática).
-   Em **Laboratórios** o administrador adiciona, edita (nome e ID), desativa, ativa e apaga.
-   O **ID** (letras e/ou números) é o `LAB_ID` do código do ESP32 daquela porta (se mudar o ID, mude também no ESP32).
-1. O administrador entra, vai em **Usuários e crachás** e cadastra os instrutores.
-2. Para descobrir o UID de um crachá: a pessoa encosta o crachá na porta; o UID
-   aparece em "Crachás lidos que ainda não têm dono". Copie e cole no usuário.
-3. Instrutor entra, escolhe o laboratório, a data e o horário e envia a solicitação.
-4. O administrador aprova em **Solicitações**.
-5. No horário aprovado, o crachá do instrutor destranca a porta **do laboratório reservado**
-   (a reserva de um laboratório não abre a porta de outro).
-   Cada tentativa fica em **Histórico de acessos**.
-
-## 4. ESP32
+## 7. Configurar e gravar o ESP32
 
 O código está em `Cod_Arduino/Cod_Arduino.ino`. Antes de gravar, preencha as configurações
 no começo do arquivo:
@@ -110,36 +123,85 @@ no começo do arquivo:
 ```cpp
 const char* WIFI_SSID  = "nome do wifi";
 const char* WIFI_PASS  = "senha do wifi";
-const char* SERVER_URL = "http://IP_DO_NOTEBOOK:5000/api/acesso";
+const char* SERVER_URL = "http://IP_DO_SERVIDOR:5000/api/acesso";
 const char* API_KEY    = "conteúdo do arquivo api.key";
 const char* LAB_ID     = "1";   // ID do laboratório (coluna "ID" na tela Laboratórios)
 ```
 
-- `SERVER_URL` usa o **IP fixo do notebook**. É HTTP simples, dentro da rede interna.
-- Em cada ESP32 mude só a linha `LAB_ID`.
-- O ESP32 só enxerga redes Wi-Fi de **2,4 GHz**.
-- **Não envie para o GitHub** o arquivo com a senha do Wi-Fi e a chave da API preenchidas.
+- `SERVER_URL`: use o **IP fixo** do computador servidor (no Windows, veja com `ipconfig`, linha *IPv4*).
+- `API_KEY`: copie o conteúdo do arquivo `api.key` que o servidor gerou.
+- `LAB_ID`: em cada ESP32 mude só esta linha.
 
-### API usada pelo ESP32
+### Ligações (pinos)
 
-`POST /api/acesso` com o cabeçalho `X-API-Key: <conteúdo de api.key>` e o corpo
-`{"uid": "04 11 22 33", "lab": "MAKER"}` (`lab` = ID do laboratório daquela porta; pode ser texto ou número).
-Resposta: `{"autorizado": true, "nome": "Fulano", "motivo": "reserva aprovada", "lab": "Laboratório Maker"}`.
+| Componente | Pino do ESP32 |
+|---|---|
+| RC522 SS (SDA) | 5 |
+| RC522 RST | 22 |
+| RC522 SCK / MISO / MOSI | 18 / 19 / 23 |
+| Relé (fechadura) | 4 |
+| LED verde (liberado) | 26 |
+| LED vermelho (negado) | 27 |
+| Buzzer passivo | 25 |
+| LED azul (status da rede) | 32 |
+| LED amarelo (status da rede) | 33 |
 
-## 5. Backup
+O relé é **ativo em LOW** (repouso em HIGH). Ao liberar o acesso, o pino do relé pulsa a
+**10 Hz durante 1 segundo**, junto com um bip de aprovação.
 
-Todos os dados estão em `acesso.db` (ao atualizar um banco antigo, as reservas e acessos
-que já existiam ficam no primeiro laboratório da lista). Copie esse arquivo de vez em quando
-(por exemplo, para um pendrive ou outro computador).
+### Significado dos LEDs
 
-## Estrutura
+| LED | Significado |
+|---|---|
+| Verde | Acesso liberado |
+| Vermelho | Acesso negado ou erro de comunicação (porta trancada) |
+| Azul fixo | Wi-Fi e internet funcionando |
+| Azul e amarelo alternando | Wi-Fi conectado, mas sem internet |
+| Amarelo piscando rápido | Wi-Fi desconectado |
+
+## 8. Deixar o computador funcionando como servidor
+
+1. **IP fixo.** O ESP32 acessa o servidor pelo IP, então ele não pode mudar. Peça ao TI
+   (ou configure no roteador) para reservar um IP para o computador.
+2. **Firewall do Windows.** Na primeira vez, permita o acesso em **Rede privada**. Se o ESP32
+   não conseguir conectar, libere a porta 5000 (cmd como administrador):
+
+   ```bat
+   netsh advfirewall firewall add rule name="Projeto Gau" dir=in action=allow protocol=TCP localport=5000
+   ```
+3. **Mesma rede.** Algumas redes (escolas, empresas) isolam os aparelhos entre si.
+   Se for o caso, peça ao TI para liberar a comunicação.
+4. **Computador ligado e acordado.** Se ele dormir ou desligar, as portas deixam de abrir.
+5. **Data e hora corretas** (fuso de Brasília): as reservas dependem do relógio do servidor.
+
+## Problemas comuns
+
+- **Não consigo entrar no site:** o login é pelo **e-mail**, não pelo nome. Se esqueceu a senha de
+  um instrutor, o administrador define uma nova em **Usuários e crachás**.
+- **O ESP32 não conecta no servidor:** confira o `SERVER_URL` (IP certo, com `:5000`), se o
+  servidor está rodando, o firewall e se os dois estão na mesma rede.
+- **O ESP32 conecta, mas dá erro 401 / 403:** a `API_KEY` do ESP32 está diferente do `api.key` do servidor.
+- **O crachá é lido, mas a porta não abre:** veja em **Histórico de acessos** o motivo da recusa
+  (sem reserva aprovada, crachá sem dono, laboratório diferente ou fora do horário) e confira o `LAB_ID`.
+- **Para gerar PDF** o servidor precisa da biblioteca `reportlab` (já está no `requirements.txt`).
+
+## Segurança e backup
+
+- O servidor usa **HTTP simples** e foi pensado para a **rede interna**. Não o exponha na internet.
+- `acesso.db`, `secret.key` e `api.key` contêm dados e segredos reais: **nunca envie para o GitHub**.
+  Também não envie o `.ino` com a senha do Wi-Fi e a chave da API preenchidas.
+- **Backup:** todos os dados estão em `acesso.db`. Copie esse arquivo de vez em quando
+  (por exemplo, para um pendrive).
+
+## Estrutura do projeto
 
 ```
 app.py              servidor, rotas e regras
 schema.sql          tabelas do banco
-criar_admin.py      cria o primeiro administrador
+criar_admin.py      cria administradores pelo terminal
 requirements.txt    dependências do Python
+iniciar.bat         atalho para iniciar o servidor no Windows
 templates/          páginas HTML
-static/estilo.css   visual
+static/             estilo e ícones
 Cod_Arduino/        código do ESP32 (Cod_Arduino.ino)
 ```
